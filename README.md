@@ -1,7 +1,8 @@
-# contact
-distributed contact tracing
+# CoEpi Backend - Rust
 
-# How to deploy
+Rust implementation of [CoEpi](https://github.com/Co-Epi) backend - for distributed contact tracing. 
+
+## How to deploy
 
 You'll need:
 - [Rust 1.41 or newer](https://www.rust-lang.org/learn/get-started)
