@@ -1,33 +1,6 @@
 use super::*;
 use chrono::*;
 
-fn case_key(id: &str) -> String {
-    format!("case:{}", id)
-}
-
-fn time_key(ts: chrono::DateTime<Utc>) -> String {
-    format!("{}", ts.format("time:%Y:%j:%H"))
-}
-
-fn time_to_str<Tz>(ts: chrono::DateTime<Tz>) -> String
-where
-    Tz: TimeZone,
-    Tz::Offset: std::fmt::Display,
-{
-    ts.to_rfc3339()
-}
-
-fn str_to_time(st: &str) -> Result<chrono::DateTime<Utc>, Error> {
-    Ok(DateTime::parse_from_rfc3339(st)?.into())
-}
-
-fn time_keys_since(ts: chrono::DateTime<Utc>) -> impl Iterator<Item = String> {
-    let num_hours = Utc::now().signed_duration_since(ts).num_hours();
-    (0..num_hours)
-        .map(chrono::Duration::hours)
-        .map(move |dur| time_key(ts + dur))
-}
-
 pub mod report_new_symptoms {
     use super::*;
 
@@ -135,4 +108,31 @@ pub mod get_cases {
             })
         }
     }
+}
+
+fn case_key(id: &str) -> String {
+    format!("case:{}", id)
+}
+
+fn time_key(ts: chrono::DateTime<Utc>) -> String {
+    format!("{}", ts.format("time:%Y:%j:%H"))
+}
+
+fn time_to_str<Tz>(ts: chrono::DateTime<Tz>) -> String
+where
+    Tz: TimeZone,
+    Tz::Offset: std::fmt::Display,
+{
+    ts.to_rfc3339()
+}
+
+fn str_to_time(st: &str) -> Result<chrono::DateTime<Utc>, Error> {
+    Ok(DateTime::parse_from_rfc3339(st)?.into())
+}
+
+fn time_keys_since(ts: chrono::DateTime<Utc>) -> impl Iterator<Item = String> {
+    let num_hours = Utc::now().signed_duration_since(ts).num_hours();
+    (0..num_hours)
+        .map(chrono::Duration::hours)
+        .map(move |dur| time_key(ts + dur))
 }
