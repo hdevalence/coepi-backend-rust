@@ -2,6 +2,8 @@ use serde::Serialize;
 use std::convert::Infallible;
 use warp::{http::StatusCode, Rejection, Reply};
 
+pub(crate) mod context;
+
 #[derive(Serialize)]
 struct ErrorMessage {
     code: u16,
@@ -9,11 +11,23 @@ struct ErrorMessage {
 }
 
 #[derive(Debug)]
-pub(crate) struct ErrReport(eyre::ErrReport);
+pub(crate) struct ErrReport(eyre::ErrReport<context::Context>);
 
-impl From<eyre::ErrReport> for ErrReport {
-    fn from(inner: eyre::ErrReport) -> Self {
-        Self(inner)
+impl ErrReport {
+    pub(crate) fn wrap_err<D>(self, msg: D) -> Self
+    where
+        D: std::fmt::Display + Send + Sync + 'static,
+    {
+        Self(self.0.wrap_err(msg))
+    }
+}
+
+impl<E> From<E> for ErrReport
+where
+    E: Into<eyre::ErrReport<context::Context>>,
+{
+    fn from(inner: E) -> Self {
+        Self(inner.into())
     }
 }
 
@@ -25,8 +39,8 @@ impl std::fmt::Display for ErrReport {
     }
 }
 
-pub(crate) fn into_warp(report: impl Into<eyre::ErrReport>) -> Rejection {
-    warp::reject::custom(ErrReport::from(report.into()))
+pub(crate) fn into_warp(report: impl Into<ErrReport>) -> Rejection {
+    warp::reject::custom(report.into())
 }
 
 pub(crate) async fn handle_rejection(err: Rejection) -> Result<impl Reply, Infallible> {

@@ -1,9 +1,11 @@
-use super::{ReportTimestamp, SignedReport};
-use eyre::{eyre, ErrReport};
+use super::{error::ErrReport, ReportTimestamp, SignedReport};
+use crate::error::context::Status;
+use eyre::eyre;
 use rand::rngs::OsRng;
 use rand::seq::SliceRandom;
 use std::collections::HashMap;
 use std::sync::Mutex;
+use warp::http::StatusCode;
 
 #[derive(Default)]
 pub(crate) struct StorageEntry {
@@ -22,9 +24,10 @@ impl Storage {
         let mut map = self.map.lock().unwrap();
         let entry = map.entry(now).or_default();
         if entry.bytes.is_some() {
-            return Err(eyre!(
+            Err(eyre!(
                 "Attempted to save for entry that has been read from. Is time broken?"
-            ));
+            ))
+            .set_status(StatusCode::CONFLICT)?;
         }
         entry.reports.push(report);
         Ok(format!("report saved"))
@@ -34,7 +37,9 @@ impl Storage {
         let mut map = self.map.lock().unwrap();
         let entry = map
             .get_mut(&timeframe)
-            .ok_or(eyre!("No entries for this timestamp"))?;
+            .ok_or(eyre!("No entries for this timestamp"))
+            .set_status(StatusCode::NOT_FOUND)?;
+
         if entry.bytes.is_none() {
             entry.reports.shuffle(&mut OsRng);
 
