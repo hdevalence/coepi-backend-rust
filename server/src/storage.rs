@@ -8,10 +8,38 @@ use std::sync::Mutex;
 use tracing::instrument;
 use warp::http::StatusCode;
 
-#[derive(Default)]
-pub(crate) struct StorageEntry {
-    reports: Vec<SignedReport>,
-    bytes: Option<Vec<u8>>,
+pub(crate) enum StorageEntry {
+    /// The storage entry is accepting new reports.
+    Open(Vec<SignedReport>),
+    /// The storage entry is finalized, and contains a serialization of
+    /// all reports for the time interval in random order.
+    Sealed(Vec<u8>),
+}
+
+impl Default for StorageEntry {
+    fn default() -> Self {
+        StorageEntry::Open(Vec::default())
+    }
+}
+
+impl StorageEntry {
+    /// Seal the entry, if it is open.
+    fn seal(&mut self) {
+        *self = match self {
+            StorageEntry::Sealed(_) => return,
+            StorageEntry::Open(ref mut reports) => {
+                // Shuffle reports before serializing them.
+                reports.shuffle(&mut OsRng);
+                let mut bytes = Vec::<u8>::new();
+                for report in reports {
+                    report
+                        .write(&mut bytes)
+                        .expect("let's hope no errors happen");
+                }
+                StorageEntry::Sealed(bytes)
+            }
+        }
+    }
 }
 
 #[derive(Default)]
@@ -24,37 +52,42 @@ impl Storage {
     pub(crate) async fn save(&self, report: SignedReport) -> Result<String, ErrReport> {
         let now = ReportTimestamp::now()?;
         let mut map = self.map.lock().unwrap();
-        let entry = map.entry(now).or_default();
-        if entry.bytes.is_some() {
-            Err(eyre!(
-                "Attempted to save for entry that has been read from. Is time broken?"
-            ))
-            .set_status(StatusCode::CONFLICT)?;
+        match map.entry(now).or_default() {
+            StorageEntry::Open(ref mut reports) => {
+                reports.push(report);
+                Ok(format!("report saved"))
+            }
+            StorageEntry::Sealed(_) => {
+                Err(eyre!("Current entry is already sealed. Is time broken?"))
+                    .set_status(StatusCode::CONFLICT)?
+            }
         }
-        entry.reports.push(report);
-        Ok(format!("report saved"))
     }
 
     #[instrument(skip(self))]
     pub(crate) async fn get(&self, timeframe: ReportTimestamp) -> Result<Vec<u8>, ErrReport> {
+        // Reject requests for the current timeframe.
+        let current = ReportTimestamp::now()?;
+        if timeframe == current {
+            return Err(eyre!("Cannot request entries for current timeframe"))
+                .set_status(StatusCode::FORBIDDEN)?;
+        }
+
         let mut map = self.map.lock().unwrap();
         let entry = map
             .get_mut(&timeframe)
-            .ok_or(eyre!("No entries for this timestamp"))
+            .ok_or(eyre!("No entries for this timeframe"))
             .set_status(StatusCode::NOT_FOUND)?;
 
-        if entry.bytes.is_none() {
-            entry.reports.shuffle(&mut OsRng);
+        // We already checked that it's not the current timeframe, so if we see
+        // StorageEntry::Open, seal it:
+        entry.seal();
 
-            let mut bytes: Vec<u8> = vec![];
-
-            for e in &entry.reports {
-                e.write(&mut bytes)?;
-            }
-
-            entry.bytes = Some(bytes);
+        if let StorageEntry::Sealed(ref bytes) = entry {
+            Ok(bytes.clone())
+        } else {
+            Err(eyre!("Could not seal report batch"))
+                .set_status(StatusCode::INTERNAL_SERVER_ERROR)?
         }
-
-        Ok(entry.bytes.clone().unwrap())
     }
 }
