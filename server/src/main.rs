@@ -1,6 +1,6 @@
 mod storage;
 
-struct CoepiReport;
+use cen::SignedReport;
 struct ReportTimeframe;
 
 // #[tokio::main]
