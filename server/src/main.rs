@@ -20,12 +20,21 @@ async fn main() {
         .and(warp::filters::body::bytes())
         .and_then(move |body: bytes::Bytes| async move {
             let report = SignedReport::read(body.as_ref()).map_err(error::into_warp)?;
-            storage.save(report).map_err(error::into_warp).await
+            storage
+                .save(report)
+                .map_err(|e| e.wrap_err("Failed to save report"))
+                .map_err(error::into_warp)
+                .await
         });
 
     let get = warp::path!("get_reports" / ReportTimestamp)
         .and(warp::filters::method::get())
-        .and_then(move |timeframe| storage.get(timeframe).map_err(error::into_warp));
+        .and_then(move |timeframe| {
+            storage
+                .get(timeframe)
+                .map_err(|e| e.wrap_err("Failed to retrieve reports"))
+                .map_err(error::into_warp)
+        });
 
     warp::serve(submit.or(get).recover(error::handle_rejection))
         .run(([127, 0, 0, 1], 3030))
