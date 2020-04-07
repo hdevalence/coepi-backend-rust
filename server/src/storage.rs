@@ -7,7 +7,7 @@ use std::collections::HashMap;
 #[derive(Default)]
 struct StorageEntry {
     reports: Vec<SignedReport>,
-    is_randomized: bool,
+    bytes: Option<Vec<u8>>,
 }
 
 #[derive(Default)]
@@ -19,7 +19,7 @@ impl Storage {
     pub(crate) fn save(&mut self, report: SignedReport) -> Result<(), ErrReport> {
         let now = ReportTimestamp::now()?;
         let entry = self.map.entry(now).or_default();
-        if entry.is_randomized {
+        if entry.bytes.is_some() {
             return Err(eyre!("Attempted to save for entry that has been read from. Is time broken?"))
         }
         entry.reports.push(report);
@@ -28,16 +28,18 @@ impl Storage {
 
     pub(crate) fn get(&mut self, timeframe: ReportTimestamp) -> Result<Vec<u8>, ErrReport> {
         let entry = self.map.get_mut(&timeframe).ok_or(eyre!("No entries for this timestamp"))?;
-        if !entry.is_randomized {
-            entry.is_randomized = true;
-            entry.reports.shuffle(&mut OsRng)
+        if entry.bytes.is_none() {
+            entry.reports.shuffle(&mut OsRng);
+
+            let mut bytes: Vec<u8> = vec![];
+
+            for e in &entry.reports {
+                e.write(&mut bytes)?;
+            }
+
+            entry.bytes = Some(bytes);
         }
 
-        let mut bytes: Vec<u8> = vec![];
-
-        for e in &entry.reports {
-            e.write(&mut bytes)?;
-        }
-        Ok(bytes)
+        Ok(entry.bytes.clone().unwrap())
     }
 }
