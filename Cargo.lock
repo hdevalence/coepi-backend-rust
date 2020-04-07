@@ -98,6 +98,7 @@ dependencies = [
  "bytes",
  "cen",
  "eyre",
+ "serde",
  "tokio",
  "warp",
 ]
@@ -115,16 +116,6 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "ddfc5b9aa5d4507acaf872de71051dfd0e309860e88966e1051e462a077aac4f"
 dependencies = [
  "bitflags",
-]
-
-[[package]]
-name = "contact_client"
-version = "0.1.0"
-dependencies = [
- "libc",
- "once_cell",
- "rand 0.7.3",
- "rand_chacha 0.2.2",
 ]
 
 [[package]]
@@ -615,12 +606,6 @@ dependencies = [
  "libc",
  "winapi 0.3.8",
 ]
-
-[[package]]
-name = "once_cell"
-version = "1.3.1"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "b1c601810575c99596d4afc46f78a678c80105117c379eb3650cf99b8a21ce5b"
 
 [[package]]
 name = "opaque-debug"
