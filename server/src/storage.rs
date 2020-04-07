@@ -1,10 +1,10 @@
-use super::{CoepiReport, ReportTimeframe};
+use super::{ReportTimeframe, SignedReport};
 use eyre::ErrReport;
 
-pub(crate) fn save(report: CoepiReport) -> Result<(), ErrReport> {
+pub(crate) fn save(report: SignedReport) -> Result<(), ErrReport> {
     unimplemented!();
 }
 
-pub(crate) fn get(timeframe: ReportTimeframe) -> Result<Vec<CoepiReport>, ErrReport> {
+pub(crate) fn get(timeframe: ReportTimeframe) -> Result<Vec<u8>, ErrReport> {
     unimplemented!();
 }

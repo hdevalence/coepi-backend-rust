@@ -11,3 +11,4 @@ tokio = { version = "0.2", features = ["macros"] }
 warp = "0.2"
 eyre = "0.3.5"
 bytes = "0.5.4"
+cen = { git = "https://github.com/Co-Epi/CEN.git", branch = "main" }
