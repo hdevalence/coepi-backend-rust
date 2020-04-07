@@ -7,7 +7,7 @@ use tracing_error::SpanTraceStatus;
 use warp::http::StatusCode;
 
 pub(crate) struct Context {
-    status: StatusCode,
+    pub(crate) status: StatusCode,
     span_trace: SpanTrace,
 }
 

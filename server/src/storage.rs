@@ -5,6 +5,7 @@ use rand::rngs::OsRng;
 use rand::seq::SliceRandom;
 use std::collections::HashMap;
 use std::sync::Mutex;
+use tracing::instrument;
 use warp::http::StatusCode;
 
 #[derive(Default)]
@@ -19,6 +20,7 @@ pub struct Storage {
 }
 
 impl Storage {
+    #[instrument(skip(self))]
     pub(crate) async fn save(&self, report: SignedReport) -> Result<String, ErrReport> {
         let now = ReportTimestamp::now()?;
         let mut map = self.map.lock().unwrap();
@@ -33,6 +35,7 @@ impl Storage {
         Ok(format!("report saved"))
     }
 
+    #[instrument(skip(self))]
     pub(crate) async fn get(&self, timeframe: ReportTimestamp) -> Result<Vec<u8>, ErrReport> {
         let mut map = self.map.lock().unwrap();
         let entry = map

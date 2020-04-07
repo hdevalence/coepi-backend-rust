@@ -10,8 +10,7 @@ struct ErrorMessage {
     message: String,
 }
 
-#[derive(Debug)]
-pub(crate) struct ErrReport(eyre::ErrReport<context::Context>);
+pub(crate) struct ErrReport(pub(crate) eyre::ErrReport<context::Context>);
 
 impl ErrReport {
     pub(crate) fn wrap_err<D>(self, msg: D) -> Self
@@ -39,6 +38,12 @@ impl std::fmt::Display for ErrReport {
     }
 }
 
+impl std::fmt::Debug for ErrReport {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        std::fmt::Debug::fmt(&self.0, f)
+    }
+}
+
 pub(crate) fn into_warp(report: impl Into<ErrReport>) -> Rejection {
     warp::reject::custom(report.into())
 }
@@ -49,21 +54,16 @@ pub(crate) async fn handle_rejection(err: Rejection) -> Result<impl Reply, Infal
 
     if err.is_not_found() {
         code = StatusCode::NOT_FOUND;
-        message = "NOT_FOUND".into();
+        message = "NOT_FOUND\n".into();
     } else if let Some(report) = err.find::<ErrReport>() {
-        code = StatusCode::BAD_REQUEST;
-        message = format!("Error: {:?}", report);
+        code = report.0.context().status;
+        message = format!("Error: {:?}\n", report);
     } else {
         // We should have expected this... Just log and say its a 500
         eprintln!("unhandled rejection: {:?}", err);
         code = StatusCode::INTERNAL_SERVER_ERROR;
-        message = "UNHANDLED_REJECTION".into();
+        message = "UNHANDLED_REJECTION\n".into();
     }
 
-    let json = warp::reply::json(&ErrorMessage {
-        code: code.as_u16(),
-        message,
-    });
-
-    Ok(warp::reply::with_status(json, code))
+    Ok(warp::reply::with_status(message, code))
 }

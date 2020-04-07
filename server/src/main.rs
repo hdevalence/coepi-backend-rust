@@ -1,6 +1,9 @@
 use cen::SignedReport;
 use futures::TryFutureExt;
 use once_cell::sync::Lazy;
+use tracing::instrument;
+use tracing_error::ErrorLayer;
+use tracing_subscriber::{prelude::*, EnvFilter};
 use warp::Filter;
 
 pub use timestamp::ReportTimestamp;
@@ -12,7 +15,21 @@ mod timestamp;
 static STORAGE: Lazy<storage::Storage> = Lazy::new(storage::Storage::default);
 
 #[tokio::main]
+#[instrument]
 async fn main() {
+    color_backtrace::install();
+
+    let filter = EnvFilter::try_from_default_env()
+        .or_else(|_| EnvFilter::try_new("trace"))
+        .unwrap();
+
+    tracing_subscriber::fmt()
+        .with_target(false)
+        .finish()
+        .with(ErrorLayer::default())
+        .with(filter)
+        .init();
+
     let storage = &*STORAGE;
     let submit = warp::path!("submit")
         .and(warp::filters::method::post())
