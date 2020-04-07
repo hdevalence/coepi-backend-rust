@@ -1,33 +1,48 @@
-use super::{ReportTimestamp, SignedReport};
-use eyre::{eyre, ErrReport};
-use rand::seq::SliceRandom;
+use super::{error::ErrReport, ReportTimestamp, SignedReport};
+use crate::error::context::Status;
+use eyre::eyre;
 use rand::rngs::OsRng;
+use rand::seq::SliceRandom;
 use std::collections::HashMap;
+use std::sync::Mutex;
+use tracing::instrument;
+use warp::http::StatusCode;
 
 #[derive(Default)]
-struct StorageEntry {
+pub(crate) struct StorageEntry {
     reports: Vec<SignedReport>,
     bytes: Option<Vec<u8>>,
 }
 
 #[derive(Default)]
 pub struct Storage {
-    map: HashMap<ReportTimestamp, StorageEntry>
+    map: Mutex<HashMap<ReportTimestamp, StorageEntry>>,
 }
 
 impl Storage {
-    pub(crate) fn save(&mut self, report: SignedReport) -> Result<(), ErrReport> {
+    #[instrument(skip(self))]
+    pub(crate) async fn save(&self, report: SignedReport) -> Result<String, ErrReport> {
         let now = ReportTimestamp::now()?;
-        let entry = self.map.entry(now).or_default();
+        let mut map = self.map.lock().unwrap();
+        let entry = map.entry(now).or_default();
         if entry.bytes.is_some() {
-            return Err(eyre!("Attempted to save for entry that has been read from. Is time broken?"))
+            Err(eyre!(
+                "Attempted to save for entry that has been read from. Is time broken?"
+            ))
+            .set_status(StatusCode::CONFLICT)?;
         }
         entry.reports.push(report);
-        Ok(())
+        Ok(format!("report saved"))
     }
 
-    pub(crate) fn get(&mut self, timeframe: ReportTimestamp) -> Result<Vec<u8>, ErrReport> {
-        let entry = self.map.get_mut(&timeframe).ok_or(eyre!("No entries for this timestamp"))?;
+    #[instrument(skip(self))]
+    pub(crate) async fn get(&self, timeframe: ReportTimestamp) -> Result<Vec<u8>, ErrReport> {
+        let mut map = self.map.lock().unwrap();
+        let entry = map
+            .get_mut(&timeframe)
+            .ok_or(eyre!("No entries for this timestamp"))
+            .set_status(StatusCode::NOT_FOUND)?;
+
         if entry.bytes.is_none() {
             entry.reports.shuffle(&mut OsRng);
 
