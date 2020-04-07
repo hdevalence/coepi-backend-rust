@@ -12,7 +12,7 @@ async fn main() {
         .and(warp::filters::method::post())
         .and(warp::filters::body::content_length_limit(1024 * 2))
         .and(warp::filters::body::bytes())
-        .map(|body| unimplemented!())
+        .map(|body: bytes::Bytes| SignedReport::read(body.as_ref()).unwrap())
         .map(|report| {
             storage::save(report).unwrap();
             Ok(format!("report saved"))
