@@ -9,3 +9,4 @@ edition = "2018"
 [dependencies]
 # warp = "0.2"
 eyre = "0.3.5"
+cen = { git = "https://github.com/Co-Epi/CEN.git", branch = "main" }
