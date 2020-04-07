@@ -1,18 +1,12 @@
 use cen::SignedReport;
 use warp::Filter;
 
+pub use timestamp::ReportTimestamp;
+
 mod storage;
+mod timestamp;
 
 struct CoepiReport(bytes::Bytes);
-struct ReportTimeframe;
-
-impl std::str::FromStr for ReportTimeframe {
-    type Err = std::convert::Infallible;
-
-    fn from_str(input: &str) -> Result<Self, Self::Err> {
-        unimplemented!()
-    }
-}
 
 #[tokio::main]
 async fn main() {
@@ -26,7 +20,7 @@ async fn main() {
             Ok(format!("report saved"))
         });
 
-    let get = warp::path!("get_reports" / ReportTimeframe)
+    let get = warp::path!("get_reports" / ReportTimestamp)
         .and(warp::filters::method::get())
         .map(|timeframe| {
             let reports = storage::get(timeframe).unwrap();
