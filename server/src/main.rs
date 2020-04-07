@@ -1,7 +1,8 @@
 mod storage;
+mod timestamp;
 
+pub use timestamp::ReportTimestamp;
 struct CoepiReport;
-struct ReportTimeframe;
 
 // #[tokio::main]
 fn main() {
