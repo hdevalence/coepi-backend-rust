@@ -1,10 +1,10 @@
 use super::{CoepiReport, ReportTimeframe};
 use eyre::ErrReport;
 
-fn save(report: CoepiReport) -> Result<(), ErrReport> {
+pub(crate) fn save(report: CoepiReport) -> Result<(), ErrReport> {
     unimplemented!();
 }
 
-fn get(timeframe: ReportTimeframe) -> Result<Vec<CoepiReport>, ErrReport> {
+pub(crate) fn get(timeframe: ReportTimeframe) -> Result<Vec<CoepiReport>, ErrReport> {
     unimplemented!();
 }
