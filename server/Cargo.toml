@@ -7,6 +7,8 @@ edition = "2018"
 # See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
 
 [dependencies]
-# warp = "0.2"
+tokio = { version = "0.2", features = ["macros"] }
+warp = "0.2"
 eyre = "0.3.5"
+bytes = "0.5.4"
 cen = { git = "https://github.com/Co-Epi/CEN.git", branch = "main" }

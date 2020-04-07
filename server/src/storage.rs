@@ -1,10 +1,10 @@
-use super::{SignedReport, ReportTimeframe};
+use super::{ReportTimestamp, SignedReport};
 use eyre::ErrReport;
 
-fn save(report: SignedReport) -> Result<(), ErrReport> {
+pub(crate) fn save(report: SignedReport) -> Result<(), ErrReport> {
     unimplemented!();
 }
 
-fn get(timeframe: ReportTimeframe) -> Result<Vec<u8>, ErrReport> {
+pub(crate) fn get(timeframe: ReportTimestamp) -> Result<Vec<u8>, ErrReport> {
     unimplemented!();
 }
