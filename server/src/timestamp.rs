@@ -6,7 +6,7 @@ pub struct ReportTimestamp(pub u64);
 impl std::str::FromStr for ReportTimestamp {
     type Err = std::convert::Infallible;
 
-    fn from_str(input: &str) -> Result<Self, Self::Err> {
+    fn from_str(_: &str) -> Result<Self, Self::Err> {
         unimplemented!()
     }
 }
