@@ -6,6 +6,14 @@ mod storage;
 struct CoepiReport(bytes::Bytes);
 struct ReportTimeframe;
 
+impl std::str::FromStr for ReportTimeframe {
+    type Err = std::convert::Infallible;
+
+    fn from_str(input: &str) -> Result<Self, Self::Err> {
+        unimplemented!()
+    }
+}
+
 #[tokio::main]
 async fn main() {
     let submit = warp::path!("submit")
@@ -18,5 +26,14 @@ async fn main() {
             Ok(format!("report saved"))
         });
 
-    warp::serve(submit).run(([127, 0, 0, 1], 3030)).await;
+    let get = warp::path!("get_reports" / ReportTimeframe)
+        .and(warp::filters::method::get())
+        .map(|timeframe| {
+            let reports = storage::get(timeframe).unwrap();
+            reports
+        });
+
+    warp::serve(submit.or(get))
+        .run(([127, 0, 0, 1], 3030))
+        .await;
 }
