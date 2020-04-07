@@ -6,8 +6,6 @@ pub use timestamp::ReportTimestamp;
 mod storage;
 mod timestamp;
 
-struct CoepiReport(bytes::Bytes);
-
 #[tokio::main]
 async fn main() {
     let submit = warp::path!("submit")

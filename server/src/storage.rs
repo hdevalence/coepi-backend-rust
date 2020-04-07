@@ -1,4 +1,4 @@
-use super::{CoepiReport, ReportTimestamp, SignedReport};
+use super::{ReportTimestamp, SignedReport};
 use eyre::ErrReport;
 
 pub(crate) fn save(report: SignedReport) -> Result<(), ErrReport> {
