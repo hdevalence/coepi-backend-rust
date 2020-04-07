@@ -15,7 +15,6 @@ mod timestamp;
 static STORAGE: Lazy<storage::Storage> = Lazy::new(storage::Storage::default);
 
 #[tokio::main]
-#[instrument]
 async fn main() {
     color_backtrace::install();
 

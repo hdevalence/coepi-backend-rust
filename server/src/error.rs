@@ -1,14 +1,7 @@
-use serde::Serialize;
 use std::convert::Infallible;
 use warp::{http::StatusCode, Rejection, Reply};
 
 pub(crate) mod context;
-
-#[derive(Serialize)]
-struct ErrorMessage {
-    code: u16,
-    message: String,
-}
 
 pub(crate) struct ErrReport(pub(crate) eyre::ErrReport<context::Context>);
 
@@ -54,7 +47,8 @@ pub(crate) async fn handle_rejection(err: Rejection) -> Result<impl Reply, Infal
 
     if err.is_not_found() {
         code = StatusCode::NOT_FOUND;
-        message = "NOT_FOUND\n".into();
+        message =
+            format!("Error: {}\nNote: The supported endpoints by this server are `submit` and `get_reports/<timestamp>`\n", code);
     } else if let Some(report) = err.find::<ErrReport>() {
         code = report.0.context().status;
         message = format!("Error: {:?}\n", report);

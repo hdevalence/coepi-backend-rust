@@ -182,7 +182,6 @@ dependencies = [
  "indenter",
  "once_cell",
  "rand 0.7.3",
- "serde",
  "tokio",
  "tracing",
  "tracing-error",
