@@ -3,7 +3,7 @@ mod storage;
 struct CoepiReport;
 struct ReportTimeframe;
 
-#[tokio::main]
-async fn main() {
+// #[tokio::main]
+fn main() {
     unimplemented!();
 }

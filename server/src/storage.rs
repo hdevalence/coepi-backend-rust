@@ -5,4 +5,6 @@ fn save(report: CoepiReport) -> Result<(), ErrReport> {
     unimplemented!();
 }
 
-fn get(timeframe: ReportTimeframe) -> Result<Vec<CoepiReport>, ErrReport> {}
+fn get(timeframe: ReportTimeframe) -> Result<Vec<CoepiReport>, ErrReport> {
+    unimplemented!();
+}
