@@ -1,5 +1,5 @@
 [package]
-name = "contact_server2"
+name = "cen_server"
 version = "0.1.0"
 authors = ["Jane Lusby <jlusby42@gmail.com>"]
 edition = "2018"
