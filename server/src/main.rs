@@ -4,14 +4,27 @@ use once_cell::sync::Lazy;
 use tracing_error::ErrorLayer;
 use tracing_subscriber::{prelude::*, EnvFilter};
 use warp::Filter;
-
-pub use timestamp::ReportTimestamp;
+use structopt::StructOpt;
+use tracing::{info};
 
 mod error;
 mod storage;
 mod timestamp;
 
 static STORAGE: Lazy<storage::Storage> = Lazy::new(storage::Storage::default);
+static OPTIONS: Lazy<Opt> = Lazy::new(Opt::from_args);
+
+pub use timestamp::ReportTimestamp;
+
+#[derive(Debug, StructOpt)]
+struct Opt {
+    /// The time interval over which to batch reports, in seconds.
+    #[structopt(short, long, default_value = "21600")]
+    seconds_per_batch: u64,
+    /// The socket address to bind to.
+    #[structopt(short, long, default_value = "127.0.0.1:3030")]
+    address: std::net::SocketAddr,
+}
 
 #[tokio::main]
 async fn main() {
@@ -27,6 +40,8 @@ async fn main() {
         .with(ErrorLayer::default())
         .with(filter)
         .init();
+
+    info!(options = ?*OPTIONS);
 
     let storage = &*STORAGE;
     let submit = warp::path!("submit")
@@ -52,6 +67,6 @@ async fn main() {
         });
 
     warp::serve(submit.or(get).recover(error::handle_rejection))
-        .run(([127, 0, 0, 1], 3030))
+        .run(OPTIONS.address)
         .await;
 }

@@ -11,16 +11,15 @@ impl std::str::FromStr for ReportTimestamp {
     }
 }
 
-impl ReportTimestamp {
-    // half a day
-    pub const SECONDS_PER_TIMESTAMP: u64 = 60 * 60 * 12;
+use super::OPTIONS;
 
+impl ReportTimestamp {
     pub fn start_time(&self) -> SystemTime {
-        SystemTime::UNIX_EPOCH + Duration::from_secs(self.0 * Self::SECONDS_PER_TIMESTAMP)
+        SystemTime::UNIX_EPOCH + Duration::from_secs(self.0 * OPTIONS.seconds_per_batch)
     }
 
     pub fn end_time(&self) -> SystemTime {
-        SystemTime::UNIX_EPOCH + Duration::from_secs((self.0 + 1) * Self::SECONDS_PER_TIMESTAMP)
+        SystemTime::UNIX_EPOCH + Duration::from_secs((self.0 + 1) * OPTIONS.seconds_per_batch)
             - Duration::from_nanos(1)
     }
 
@@ -30,7 +29,7 @@ impl ReportTimestamp {
 
     pub fn from_time(t: SystemTime) -> Result<Self, SystemTimeError> {
         Ok(Self(
-            t.duration_since(SystemTime::UNIX_EPOCH)?.as_secs() / Self::SECONDS_PER_TIMESTAMP,
+            t.duration_since(SystemTime::UNIX_EPOCH)?.as_secs() / OPTIONS.seconds_per_batch,
         ))
     }
 }
