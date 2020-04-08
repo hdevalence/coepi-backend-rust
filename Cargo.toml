@@ -8,5 +8,5 @@ members = [
 codegen-units = 12
 
 [patch.crates-io]
-# warp = { git = "https://github.com/yaahc/warp.git" }
-warp = { path = "/home/jlusby/git/rust/warp" }
+warp = { git = "https://github.com/yaahc/warp.git" }
+# warp = { path = "/home/jlusby/git/rust/warp" }
