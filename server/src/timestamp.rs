@@ -7,7 +7,7 @@ impl std::str::FromStr for ReportTimestamp {
     type Err = std::num::ParseIntError;
 
     fn from_str(input: &str) -> Result<Self, Self::Err> {
-        Ok(Self(input.parse()?))
+        Ok(Self(dbg!(input.parse())?))
     }
 }
 

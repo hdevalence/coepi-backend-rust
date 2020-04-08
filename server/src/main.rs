@@ -1,9 +1,9 @@
 use cen::SignedReport;
 use futures::TryFutureExt;
 use once_cell::sync::Lazy;
-use tracing::instrument;
 use tracing_error::ErrorLayer;
 use tracing_subscriber::{prelude::*, EnvFilter};
+use warp::reject::Rejection;
 use warp::Filter;
 
 pub use timestamp::ReportTimestamp;
@@ -35,11 +35,11 @@ async fn main() {
         .and(warp::filters::body::content_length_limit(1024 * 2))
         .and(warp::filters::body::bytes())
         .and_then(move |body: bytes::Bytes| async move {
-            let report = SignedReport::read(body.as_ref()).map_err(error::into_warp)?;
+            let report = SignedReport::read(body.as_ref())?;
             storage
                 .save(report)
                 .map_err(|e| e.wrap_err("Failed to save report"))
-                .map_err(error::into_warp)
+                .map_err(Rejection::from)
                 .await
         });
 
@@ -49,7 +49,7 @@ async fn main() {
             storage
                 .get(timeframe)
                 .map_err(|e| e.wrap_err("Failed to retrieve reports"))
-                .map_err(error::into_warp)
+                .map_err(Rejection::from)
         });
 
     warp::serve(submit.or(get).recover(error::handle_rejection))

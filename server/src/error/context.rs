@@ -63,7 +63,7 @@ where
     fn set_status(self, status: StatusCode) -> Self::Result {
         self.map_err(|e| {
             let mut reporter = e.into();
-            reporter.0.context_mut().status = status;
+            reporter.context_mut().status = status;
             reporter
         })
     }
