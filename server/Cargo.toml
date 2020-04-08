@@ -1,5 +1,5 @@
 [package]
-name = "cen_server"
+name = "tcn_server"
 version = "0.1.0"
 authors = ["Jane Lusby <jlusby42@gmail.com>"]
 edition = "2018"
@@ -11,7 +11,7 @@ tokio = { version = "0.2", features = ["macros"] }
 warp = "0.2"
 eyre = "0.3.7"
 bytes = "0.5.4"
-cen = { git = "https://github.com/Co-Epi/CEN.git", branch = "main" }
+tcn = "0.4.1"
 rand = "0.7.3"
 once_cell = "1.3.1"
 futures = "0.3.4"
