@@ -54,6 +54,7 @@ impl Storage {
         let mut map = self.map.lock().unwrap();
         match map.entry(now).or_default() {
             StorageEntry::Open(ref mut reports) => {
+                report.clone().verify().set_status(StatusCode::BAD_REQUEST)?;
                 reports.push(report);
                 Ok(format!("report saved"))
             }

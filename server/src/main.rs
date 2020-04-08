@@ -1,7 +1,6 @@
 use cen::SignedReport;
 use futures::TryFutureExt;
 use once_cell::sync::Lazy;
-use tracing::instrument;
 use tracing_error::ErrorLayer;
 use tracing_subscriber::{prelude::*, EnvFilter};
 use warp::Filter;
