@@ -1,11 +1,11 @@
-use tcn::SignedReport;
 use futures::TryFutureExt;
 use once_cell::sync::Lazy;
+use structopt::StructOpt;
+use tcn::SignedReport;
+use tracing::info;
 use tracing_error::ErrorLayer;
 use tracing_subscriber::{prelude::*, EnvFilter};
 use warp::Filter;
-use structopt::StructOpt;
-use tracing::{info};
 
 mod error;
 mod storage;
@@ -36,9 +36,9 @@ async fn main() {
 
     tracing_subscriber::fmt()
         .with_target(false)
+        .with_env_filter(filter)
         .finish()
         .with(ErrorLayer::default())
-        .with(filter)
         .init();
 
     info!(options = ?*OPTIONS);
