@@ -74,7 +74,8 @@ async fn main() {
 
     info!(options = ?*OPTIONS);
 
-    let (tx, _) = tokio::sync::broadcast::channel(OPTIONS.num_users * 2);
+    let tcn_broadcast_buffer_size = OPTIONS.num_users * 20;
+    let (tx, _) = tokio::sync::broadcast::channel(tcn_broadcast_buffer_size);
 
     let mut users = futures::stream::FuturesUnordered::new();
 
