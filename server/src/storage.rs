@@ -5,7 +5,7 @@ use rand::rngs::OsRng;
 use rand::seq::SliceRandom;
 use std::collections::HashMap;
 use std::sync::Mutex;
-use tracing::{debug, instrument};
+use tracing::{debug, info, instrument};
 use warp::http::StatusCode;
 
 pub(crate) enum StorageEntry {
@@ -28,14 +28,20 @@ impl StorageEntry {
         *self = match self {
             StorageEntry::Sealed(_) => return,
             StorageEntry::Open(ref mut reports) => {
+                let count = reports.len();
                 // Shuffle reports before serializing them.
                 reports.shuffle(&mut OsRng);
                 let mut bytes = Vec::<u8>::new();
                 for report in reports {
                     report
                         .write(&mut bytes)
-                        .expect("let's hope no errors happen");
+                        .expect("report serialization should be infallible");
                 }
+                info!(
+                    count,
+                    num_bytes = bytes.len(),
+                    "sealed reports into byte buffer"
+                );
                 StorageEntry::Sealed(bytes)
             }
         }

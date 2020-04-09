@@ -78,8 +78,8 @@ async fn main() {
 
     let mut users = futures::stream::FuturesUnordered::new();
 
-    use tokio::time::delay_for;
     use std::time::Duration;
+    use tokio::time::delay_for;
 
     for id in 0..OPTIONS.num_users {
         // Stagger the start of each user.
