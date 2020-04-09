@@ -1,11 +1,11 @@
-use tcn::SignedReport;
 use futures::TryFutureExt;
 use once_cell::sync::Lazy;
+use structopt::StructOpt;
+use tcn::SignedReport;
+use tracing::info;
 use tracing_error::ErrorLayer;
 use tracing_subscriber::{prelude::*, EnvFilter};
 use warp::Filter;
-use structopt::StructOpt;
-use tracing::{info};
 
 mod error;
 mod storage;
@@ -19,6 +19,9 @@ pub use timestamp::ReportTimestamp;
 #[derive(Debug, StructOpt)]
 struct Opt {
     /// The time interval over which to batch reports, in seconds.
+    ///
+    /// The default value is 21600 = 6h.  This needs to be adjusted
+    /// when using the server in simulation mode, e.g., to 6s.
     #[structopt(short, long, default_value = "21600")]
     seconds_per_batch: u64,
     /// The socket address to bind to.
@@ -36,9 +39,9 @@ async fn main() {
 
     tracing_subscriber::fmt()
         .with_target(false)
+        .with_env_filter(filter)
         .finish()
         .with(ErrorLayer::default())
-        .with(filter)
         .init();
 
     info!(options = ?*OPTIONS);

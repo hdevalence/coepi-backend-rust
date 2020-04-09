@@ -5,7 +5,7 @@ use rand::rngs::OsRng;
 use rand::seq::SliceRandom;
 use std::collections::HashMap;
 use std::sync::Mutex;
-use tracing::instrument;
+use tracing::{debug, instrument};
 use warp::http::StatusCode;
 
 pub(crate) enum StorageEntry {
@@ -50,11 +50,15 @@ pub struct Storage {
 impl Storage {
     #[instrument(skip(self))]
     pub(crate) async fn save(&self, report: SignedReport) -> Result<String, ErrReport> {
+        debug!("got report");
         let now = ReportTimestamp::now()?;
         let mut map = self.map.lock().unwrap();
         match map.entry(now).or_default() {
             StorageEntry::Open(ref mut reports) => {
-                report.clone().verify().set_status(StatusCode::BAD_REQUEST)?;
+                report
+                    .clone()
+                    .verify()
+                    .set_status(StatusCode::BAD_REQUEST)?;
                 reports.push(report);
                 Ok(format!("report saved"))
             }
@@ -67,6 +71,7 @@ impl Storage {
 
     #[instrument(skip(self))]
     pub(crate) async fn get(&self, timeframe: ReportTimestamp) -> Result<Vec<u8>, ErrReport> {
+        debug!(?timeframe, "got request for entries");
         // Reject requests for the current timeframe.
         let current = ReportTimestamp::now()?;
         if timeframe == current {
