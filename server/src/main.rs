@@ -19,6 +19,9 @@ pub use timestamp::ReportTimestamp;
 #[derive(Debug, StructOpt)]
 struct Opt {
     /// The time interval over which to batch reports, in seconds.
+    ///
+    /// The default value is 21600 = 6h.  This needs to be adjusted
+    /// when using the server in simulation mode, e.g., to 6s.
     #[structopt(short, long, default_value = "21600")]
     seconds_per_batch: u64,
     /// The socket address to bind to.
