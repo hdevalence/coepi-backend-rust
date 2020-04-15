@@ -10,11 +10,13 @@ use warp::Filter;
 mod error;
 mod storage;
 mod timestamp;
+mod shard;
 
 static STORAGE: Lazy<storage::Storage> = Lazy::new(storage::Storage::default);
 static OPTIONS: Lazy<Opt> = Lazy::new(Opt::from_args);
 
 pub use timestamp::ReportTimestamp;
+pub use shard::Shard;
 
 #[derive(Debug, StructOpt)]
 struct Opt {
@@ -47,24 +49,24 @@ async fn main() {
     info!(options = ?*OPTIONS);
 
     let storage = &*STORAGE;
-    let submit = warp::path!("submit")
+    let submit = warp::path!("submit" / Shard)
         .and(warp::filters::method::post())
         .and(warp::filters::body::content_length_limit(1024 * 2))
         .and(warp::filters::body::bytes())
-        .and_then(move |body: bytes::Bytes| async move {
+        .and_then(move |shard, body: bytes::Bytes| async move {
             let report = SignedReport::read(body.as_ref()).map_err(error::into_warp)?;
             storage
-                .save(report)
+                .save(shard, report)
                 .map_err(|e| e.wrap_err("Failed to save report"))
                 .map_err(error::into_warp)
                 .await
         });
 
-    let get = warp::path!("get_reports" / ReportTimestamp)
+    let get = warp::path!("get_reports" / Shard / ReportTimestamp)
         .and(warp::filters::method::get())
-        .and_then(move |timeframe| {
+        .and_then(move |shard, timeframe| {
             storage
-                .get(timeframe)
+                .get(shard, timeframe)
                 .map_err(|e| e.wrap_err("Failed to retrieve reports"))
                 .map_err(error::into_warp)
         });
