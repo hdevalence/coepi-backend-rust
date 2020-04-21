@@ -1,3 +1,4 @@
+use eyre::eyre;
 use eyre::ErrReport;
 use once_cell::sync::Lazy;
 use structopt::StructOpt;
@@ -5,8 +6,20 @@ use tracing::info;
 use tracing_error::ErrorLayer;
 use tracing_subscriber::{prelude::*, EnvFilter};
 
+use std::collections::HashMap;
+use tokio::sync::broadcast;
+use tcn::TemporaryContactNumber;
+use rand::{
+    distributions::{Distribution, Uniform},
+    thread_rng,
+};
+
 mod user;
 use user::User;
+
+mod shard;
+use shard::ShardId;
+use shard::Shard;
 
 #[derive(Debug, StructOpt)]
 pub struct Opt {
@@ -26,6 +39,10 @@ pub struct Opt {
     #[structopt(long, default_value = "0.0001")]
     contact_probability: f64,
 
+    /// Shard change probability per TCK interval.
+    #[structopt(long, default_value = "0.00001")]
+    shard_change_probability: f64,
+    
     /// TCK rotation interval, in seconds (simtime)
     #[structopt(long, default_value = "300")]
     tck_rotation_secs: u64,
@@ -41,6 +58,10 @@ pub struct Opt {
     /// Number of users to simulate
     #[structopt(short = "n", long, default_value = "100")]
     num_users: usize,
+    
+    /// Number of shards
+    #[structopt(short = "n", long, default_value = "10")]
+    num_shards: u64,
 
     /// The probability that a user becomes infected in each rak interval.
     #[structopt(long, default_value = "0.01")]
@@ -74,18 +95,29 @@ async fn main() {
 
     info!(options = ?*OPTIONS);
 
-    let tcn_broadcast_buffer_size = OPTIONS.num_users * 20;
-    let (tx, _) = tokio::sync::broadcast::channel(tcn_broadcast_buffer_size);
+    //let tcn_broadcast_buffer_size = OPTIONS.num_users * 20;
+    //let (tx, _) = tokio::sync::broadcast::channel(tcn_broadcast_buffer_size);
 
+    let shard_choices = Uniform::new(0u64, OPTIONS.num_shards);
+    let mut channels: HashMap<ShardId, broadcast::Sender<TemporaryContactNumber>> = HashMap::new();
+    for shardid in 0u64..OPTIONS.num_shards {
+	let (tx, _) = tokio::sync::broadcast::channel(OPTIONS.num_users * 20);
+	channels.insert(shardid, tx);
+    }
+    
     let mut users = futures::stream::FuturesUnordered::new();
 
     use std::time::Duration;
     use tokio::time::delay_for;
-
+    
     for id in 0..OPTIONS.num_users {
         // Stagger the start of each user.
         delay_for(Duration::from_millis(1)).await;
-        users.push(tokio::spawn(User::default().run(id, tx.clone())));
+	let shard_id = shard_choices.sample(&mut thread_rng());
+	println!("{}", shard_id);
+	let tx = channels.get(&shard_id).unwrap().clone();
+	// TODO: Do we need to handle None here, as its a one-to-one mapping?
+	users.push(tokio::spawn(User::init(shard_id, tx).run(id, channels.clone()))); 
     }
 
     use futures::prelude::*;
