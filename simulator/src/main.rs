@@ -113,9 +113,9 @@ async fn main() {
         // Stagger the start of each user.
         delay_for(Duration::from_millis(1)).await;
 	let shard_id = shard_choices.sample(&mut thread_rng());
-	println!("{}", shard_id);
-	let tx = channels.get(&shard_id).unwrap().clone();
-	// TODO: Do we need to handle None here, as its a one-to-one mapping?
+	let tx = channels.get(&shard_id)
+	    .expect("entry must be present because we sample from known keys")
+	    .clone();
 	users.push(tokio::spawn(User::init(shard_id, tx).run(id, channels.clone()))); 
     }
 
