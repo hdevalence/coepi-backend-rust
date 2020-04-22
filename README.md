@@ -20,10 +20,10 @@ and play with the simulation parameters
 
 The server has two routes:
 
-- `POST /submit` with the binary encoding of a TCN 0.4 report to submit a
+- `POST /submit/{shard_id}` with the binary encoding of a TCN 0.4 report to submit a
   report;
 
-- `GET /get_reports/{n}` where `n` is the string encoding of a time interval
+- `GET /get_reports/{shard_id}/{n}` where `n` is the string encoding of a time interval
   index, computed as `unixtime / time_interval`.
 
 The `time_interval` is a deployment parameter, controlled by a command-line flag.
