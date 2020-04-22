@@ -1,4 +1,4 @@
-use super::{error::ErrReport, ReportTimestamp, SignedReport, Shard};
+use super::{error::ErrReport, ReportTimestamp, Shard, SignedReport};
 use crate::error::context::Status;
 use eyre::eyre;
 use rand::rngs::OsRng;
@@ -56,7 +56,11 @@ pub struct Storage {
 // TODO: Add shard
 impl Storage {
     #[instrument(skip(self))]
-    pub(crate) async fn save(&self, shard: Shard, report: SignedReport) -> Result<String, ErrReport> {
+    pub(crate) async fn save(
+        &self,
+        shard: Shard,
+        report: SignedReport,
+    ) -> Result<String, ErrReport> {
         debug!("got report");
         let now = ReportTimestamp::now()?;
         let mut map = self.map.lock().unwrap();
@@ -77,7 +81,11 @@ impl Storage {
     }
 
     #[instrument(skip(self))]
-    pub(crate) async fn get(&self, shard: Shard, timeframe: ReportTimestamp) -> Result<Vec<u8>, ErrReport> {
+    pub(crate) async fn get(
+        &self,
+        shard: Shard,
+        timeframe: ReportTimestamp,
+    ) -> Result<Vec<u8>, ErrReport> {
         debug!(?timeframe, "got request for entries");
         // Reject requests for the current timeframe.
         let current = ReportTimestamp::now()?;
@@ -88,8 +96,8 @@ impl Storage {
 
         let mut map = self.map.lock().unwrap();
         let entry = map
-	    .get_mut(&shard)
-	    .ok_or(eyre!("No entries for this shard"))
+            .get_mut(&shard)
+            .ok_or(eyre!("No entries for this shard"))
             .set_status(StatusCode::NOT_FOUND)?
             .get_mut(&timeframe)
             .ok_or(eyre!("No entries for this timeframe"))

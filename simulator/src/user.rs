@@ -17,8 +17,8 @@ use tracing::{debug, error, info, instrument, trace, warn};
 
 use crate::OPTIONS;
 
-use crate::shard::ShardId;
 use crate::shard::Shard;
+use crate::shard::ShardId;
 
 // TODO: Remember shards since last fetch. Right now only reports for the current shard get fetched.
 
@@ -32,17 +32,15 @@ pub struct User {
 }
 
 impl User {
-    pub fn init(shard_id: ShardId,
-		tx: broadcast::Sender<TemporaryContactNumber>
-    ) -> User {
+    pub fn init(shard_id: ShardId, tx: broadcast::Sender<TemporaryContactNumber>) -> User {
         let rak = ReportAuthorizationKey::new(thread_rng());
         let tck = rak.initial_temporary_contact_key();
         User {
-	    rak,
-	    rak_shards: vec![shard_id],
+            rak,
+            rak_shards: vec![shard_id],
             raks: Vec::new(),
             shard: Shard::init(shard_id, tx),
-	    tck,
+            tck,
             observed_tcns: BTreeSet::default(),
         }
     }
@@ -53,7 +51,7 @@ impl User {
     pub async fn run(
         mut self,
         id: usize,
-	channels: HashMap<ShardId, broadcast::Sender<TemporaryContactNumber>>,
+        channels: HashMap<ShardId, broadcast::Sender<TemporaryContactNumber>>,
     ) -> Result<(), ErrReport> {
         // We will use the tck rotation as the root time ticker.
         let warped_tck_rotation =
@@ -65,8 +63,8 @@ impl User {
         let max_tcks = 86400 * OPTIONS.simulation_days / OPTIONS.tck_rotation_secs;
         let tcn_observation = Bernoulli::new(OPTIONS.contact_probability).unwrap();
         let report_probability = Bernoulli::new(OPTIONS.report_probability).unwrap();
-	let shard_choices = Uniform::new(0u64, OPTIONS.num_shards);
-	let shard_change_probability = Bernoulli::new(OPTIONS.shard_change_probability).unwrap();
+        let shard_choices = Uniform::new(0u64, OPTIONS.num_shards);
+        let shard_change_probability = Bernoulli::new(OPTIONS.shard_change_probability).unwrap();
         let server_batch_interval = Duration::from_secs(OPTIONS.server_batch_interval);
 
         info!(
@@ -96,8 +94,8 @@ impl User {
             // Listen for TCNs broadcast by others.
             self.observe(&tcn_observation);
 
-	    // Change to random shard sometimes
-	    self.change_shard(&channels, &shard_choices, &shard_change_probability);
+            // Change to random shard sometimes
+            self.change_shard(&channels, &shard_choices, &shard_change_probability);
 
             // Optionally fetch new reports from the server.
             if time > (last_check + server_batch_interval) {
@@ -117,9 +115,9 @@ impl User {
     fn rotate_rak(&mut self) {
         debug!("rotating rak");
         self.raks.push((self.rak, self.rak_shards.clone()));
-	self.rak = ReportAuthorizationKey::new(thread_rng());
-	self.rak_shards = Vec::new();
-	self.tck = self.rak.initial_temporary_contact_key();
+        self.rak = ReportAuthorizationKey::new(thread_rng());
+        self.rak_shards = Vec::new();
+        self.tck = self.rak.initial_temporary_contact_key();
     }
 
     #[instrument(skip(self))]
@@ -131,25 +129,23 @@ impl User {
     }
 
     #[instrument(skip(self))]
-    fn change_shard(&mut self,
-		    channels: &HashMap<ShardId, broadcast::Sender<TemporaryContactNumber>>,
-		    shard_choices: &Uniform<ShardId>,
-		    shard_change_probability: &Bernoulli,
-    ) {
-	if shard_change_probability.sample(&mut thread_rng()) {
-	    self.rak_shards.push(self.shard.id);
-	    let new_shard = shard_choices.sample(&mut thread_rng());
-	    let new_tx = channels.get(&new_shard).unwrap().clone();
-
-	    self.shard = Shard::init(new_shard, new_tx);
-	}
-    }
-    
-    #[instrument(skip(self, tcn_observation))]
-    fn observe(
+    fn change_shard(
         &mut self,
-        tcn_observation: &Bernoulli,
-    ) -> Result<(), ErrReport> {
+        channels: &HashMap<ShardId, broadcast::Sender<TemporaryContactNumber>>,
+        shard_choices: &Uniform<ShardId>,
+        shard_change_probability: &Bernoulli,
+    ) {
+        if shard_change_probability.sample(&mut thread_rng()) {
+            self.rak_shards.push(self.shard.id);
+            let new_shard = shard_choices.sample(&mut thread_rng());
+            let new_tx = channels.get(&new_shard).unwrap().clone();
+
+            self.shard = Shard::init(new_shard, new_tx);
+        }
+    }
+
+    #[instrument(skip(self, tcn_observation))]
+    fn observe(&mut self, tcn_observation: &Bernoulli) -> Result<(), ErrReport> {
         loop {
             use broadcast::TryRecvError;
             match self.shard.rx.try_recv() {
@@ -184,9 +180,9 @@ impl User {
 
         let report_url = reqwest::Url::parse(&OPTIONS.server)?
             .join("get_reports/")?
-            // get reports for current shard 
-	    .join(&self.shard.id.to_string())?
-	    // get previous batch
+            // get reports for current shard
+            .join(&self.shard.id.to_string())?
+            // get previous batch
             .join(&(batch_index - 1).to_string())?;
 
         debug!(?report_url, "fetching reports");
@@ -236,7 +232,7 @@ impl User {
 
     #[instrument(skip(self))]
     async fn send_reports(&mut self) -> Result<(), ErrReport> {
-	self.raks.push((self.rak, self.rak_shards.clone()));
+        self.raks.push((self.rak, self.rak_shards.clone()));
 
         let raks_to_report =
             (86400 * OPTIONS.incubation_period_days / OPTIONS.rak_rotation_secs) as usize;
@@ -261,14 +257,14 @@ impl User {
                 .write(Cursor::new(&mut report_bytes))
                 .expect("writing should succeed");
 
-	    for shard_id in shard_ids {
-		let shard_url = report_url.join(&shard_id.to_string())?;
-		client
+            for shard_id in shard_ids {
+                let shard_url = report_url.join(&shard_id.to_string())?;
+                client
                     .post(shard_url.clone())
                     .body(report_bytes.clone())
                     .send()
                     .await?;
-	    }
+            }
         }
 
         Ok(())

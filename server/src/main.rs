@@ -8,15 +8,15 @@ use tracing_subscriber::{prelude::*, EnvFilter};
 use warp::Filter;
 
 mod error;
+mod shard;
 mod storage;
 mod timestamp;
-mod shard;
 
 static STORAGE: Lazy<storage::Storage> = Lazy::new(storage::Storage::default);
 static OPTIONS: Lazy<Opt> = Lazy::new(Opt::from_args);
 
-pub use timestamp::ReportTimestamp;
 pub use shard::Shard;
+pub use timestamp::ReportTimestamp;
 
 #[derive(Debug, StructOpt)]
 struct Opt {
