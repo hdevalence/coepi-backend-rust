@@ -96,7 +96,6 @@ async fn main() {
     info!(options = ?*OPTIONS);
 
     let tcn_broadcast_buffer_size = OPTIONS.num_users * 20;
-    //let (tx, _) = tokio::sync::broadcast::channel(tcn_broadcast_buffer_size);
 
     let shard_choices = Uniform::new(0u64, OPTIONS.num_shards);
     let mut channels: HashMap<ShardId, broadcast::Sender<TemporaryContactNumber>> = HashMap::new();
