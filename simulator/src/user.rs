@@ -181,7 +181,7 @@ impl User {
         let report_url = reqwest::Url::parse(&OPTIONS.server)?
             .join("get_reports/")?
             // get reports for current shard
-            .join(&self.shard.id.to_string())?
+            .join(&(self.shard.id.to_string()+"/"))?
             // get previous batch
             .join(&(batch_index - 1).to_string())?;
 
@@ -257,7 +257,7 @@ impl User {
                 .write(Cursor::new(&mut report_bytes))
                 .expect("writing should succeed");
 
-            for shard_id in shard_ids {
+            for shard_id in shard_ids.iter() {
                 let shard_url = report_url.join(&shard_id.to_string())?;
                 client
                     .post(shard_url.clone())
