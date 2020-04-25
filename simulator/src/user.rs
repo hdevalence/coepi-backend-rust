@@ -181,9 +181,9 @@ impl User {
 
         for shard_id in self.shard_hist.iter() {
             let report_url = reqwest::Url::parse(&OPTIONS.server)?
-	        // set shard_id as root
+                // set shard_id as root
                 .join(&(shard_id.to_string() + "/"))?
-		.join("get_reports/")?
+                .join("get_reports/")?
                 // get previous batch
                 .join(&(batch_index - 1).to_string())?;
 
@@ -246,7 +246,6 @@ impl User {
             .try_into()
             .unwrap();
 
-
         let client = reqwest::Client::new();
 
         for (rak, shard_ids) in self.raks.iter().rev().take(raks_to_report) {
@@ -260,9 +259,9 @@ impl User {
                 .expect("writing should succeed");
 
             for shard_id in shard_ids.iter() {
-		let report_url = reqwest::Url::parse(&OPTIONS.server)?
-		    .join(&(shard_id.to_string()+"/"))?
-		    .join("submit/")?;
+                let report_url = reqwest::Url::parse(&OPTIONS.server)?
+                    .join(&(shard_id.to_string() + "/"))?
+                    .join("submit/")?;
 
                 debug!(shard_id, "sending report to shard");
                 client

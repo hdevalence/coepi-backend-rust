@@ -62,7 +62,7 @@ async fn main() {
                 .await
         });
 
-    let get = warp::path!(Shard/ "get_reports" / ReportTimestamp)
+    let get = warp::path!(Shard / "get_reports" / ReportTimestamp)
         .and(warp::filters::method::get())
         .and_then(move |shard, timeframe| {
             storage
