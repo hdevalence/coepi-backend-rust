@@ -23,9 +23,10 @@ use crate::shard::ShardId;
 // TODO: Remember shards since last fetch. Right now only reports for the current shard get fetched.
 
 pub struct User {
-    rak: ReportAuthorizationKey,
-    rak_shards: Vec<ShardId>,
-    shard: Shard,
+    rak: ReportAuthorizationKey, // Current rak
+    rak_shards: Vec<ShardId>,    // Shards this rak was used in
+    shard: Shard,                // Current shard
+    shard_hist: Vec<ShardId>,    // Shards since last report fetch
     raks: Vec<(ReportAuthorizationKey, Vec<ShardId>)>,
     tck: TemporaryContactKey,
     observed_tcns: BTreeSet<TemporaryContactNumber>,
@@ -40,6 +41,7 @@ impl User {
             rak_shards: vec![shard_id],
             raks: Vec::new(),
             shard: Shard::init(shard_id, tx),
+            shard_hist: vec![shard_id],
             tck,
             observed_tcns: BTreeSet::default(),
         }
@@ -137,6 +139,7 @@ impl User {
     ) {
         if shard_change_probability.sample(&mut thread_rng()) {
             self.rak_shards.push(self.shard.id);
+            self.shard_hist.push(self.shard.id);
             let new_shard = shard_choices.sample(&mut thread_rng());
             let new_tx = channels.get(&new_shard).unwrap().clone();
 
@@ -178,54 +181,56 @@ impl User {
             .as_secs()
             / OPTIONS.server_batch_interval;
 
-        let report_url = reqwest::Url::parse(&OPTIONS.server)?
-            .join("get_reports/")?
-            // get reports for current shard
-            .join(&(self.shard.id.to_string()+"/"))?
-            // get previous batch
-            .join(&(batch_index - 1).to_string())?;
+        for shard_id in self.shard_hist.iter() {
+            let report_url = reqwest::Url::parse(&OPTIONS.server)?
+                .join("get_reports/")?
+                // get reports for current shard
+                .join(&(shard_id.to_string() + "/"))?
+                // get previous batch
+                .join(&(batch_index - 1).to_string())?;
 
-        debug!(?report_url, "fetching reports");
-        let rsp = reqwest::get(report_url).await?;
+            debug!(?report_url, "fetching reports");
+            let rsp = reqwest::get(report_url).await?;
 
-        match rsp.status() {
-            reqwest::StatusCode::NOT_FOUND => {
-                debug!("Got 404 (empty record)");
-                return Ok(());
-            }
-            reqwest::StatusCode::OK => {
-                debug!("Got report data from server");
-            }
-            e => {
-                // can we attach rsp info here?
-                return Err(eyre!("got unknown status code {}", e));
-            }
-        }
-
-        let bytes = rsp.bytes().await?;
-
-        // Parse each report and process it
-        tokio::task::block_in_place(|| {
-            let mut candidate_tcns = BTreeSet::new();
-
-            // Parse and expand reports
-            let mut reader = Cursor::new(bytes.as_ref());
-            while let Ok(signed_report) = SignedReport::read(&mut reader) {
-                match signed_report.verify() {
-                    Ok(report) => {
-                        candidate_tcns.extend(report.temporary_contact_numbers());
-                    }
-                    Err(_) => {
-                        warn!("got report with invalid signature");
-                    }
+            match rsp.status() {
+                reqwest::StatusCode::NOT_FOUND => {
+                    debug!("Got 404 (empty record)");
+                    return Ok(());
+                }
+                reqwest::StatusCode::OK => {
+                    debug!("Got report data from server");
+                }
+                e => {
+                    // can we attach rsp info here?
+                    return Err(eyre!("got unknown status code {}", e));
                 }
             }
 
-            let mut matches = candidate_tcns.intersection(&self.observed_tcns);
-            while let Some(tcn) = matches.next() {
-                info!(?tcn, "got report about observed tcn");
-            }
-        });
+            let bytes = rsp.bytes().await?;
+
+            // Parse each report and process it
+            tokio::task::block_in_place(|| {
+                let mut candidate_tcns = BTreeSet::new();
+
+                // Parse and expand reports
+                let mut reader = Cursor::new(bytes.as_ref());
+                while let Ok(signed_report) = SignedReport::read(&mut reader) {
+                    match signed_report.verify() {
+                        Ok(report) => {
+                            candidate_tcns.extend(report.temporary_contact_numbers());
+                        }
+                        Err(_) => {
+                            warn!("got report with invalid signature");
+                        }
+                    }
+                }
+
+                let mut matches = candidate_tcns.intersection(&self.observed_tcns);
+                while let Some(tcn) = matches.next() {
+                    info!(?tcn, ?shard_id, "got report about observed tcn from shard");
+                }
+            });
+        }
 
         Ok(())
     }
@@ -258,6 +263,7 @@ impl User {
                 .expect("writing should succeed");
 
             for shard_id in shard_ids.iter() {
+                debug!(shard_id, "sending report to shard");
                 let shard_url = report_url.join(&shard_id.to_string())?;
                 client
                     .post(shard_url.clone())
