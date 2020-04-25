@@ -14,7 +14,13 @@ export RUST_LOG="tcn_server=debug,simulator=debug"
 cargo run --release --bin tcn_server -- --help
 cargo run --release --bin simulator -- --help
 ```
-and play with the simulation parameters
+and play with the simulation parameters.
+
+Don't forget to set the batch interval to be short, e.g.:
+
+```
+cargo run --release --bin tcn_server -- -s 6
+```
 
 ## `tcn_server`
 
