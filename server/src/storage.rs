@@ -53,7 +53,6 @@ pub struct Storage {
     map: Mutex<HashMap<Shard, HashMap<ReportTimestamp, StorageEntry>>>,
 }
 
-// TODO: Add shard
 impl Storage {
     #[instrument(skip(self))]
     pub(crate) async fn save(

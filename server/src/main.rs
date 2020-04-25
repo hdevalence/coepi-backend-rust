@@ -49,7 +49,7 @@ async fn main() {
     info!(options = ?*OPTIONS);
 
     let storage = &*STORAGE;
-    let submit = warp::path!("submit" / Shard)
+    let submit = warp::path!(Shard / "submit")
         .and(warp::filters::method::post())
         .and(warp::filters::body::content_length_limit(1024 * 2))
         .and(warp::filters::body::bytes())
@@ -62,7 +62,7 @@ async fn main() {
                 .await
         });
 
-    let get = warp::path!("get_reports" / Shard / ReportTimestamp)
+    let get = warp::path!(Shard/ "get_reports" / ReportTimestamp)
         .and(warp::filters::method::get())
         .and_then(move |shard, timeframe| {
             storage

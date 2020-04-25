@@ -20,8 +20,6 @@ use crate::OPTIONS;
 use crate::shard::Shard;
 use crate::shard::ShardId;
 
-// TODO: Remember shards since last fetch. Right now only reports for the current shard get fetched.
-
 pub struct User {
     rak: ReportAuthorizationKey, // Current rak
     rak_shards: Vec<ShardId>,    // Shards this rak was used in
@@ -183,9 +181,9 @@ impl User {
 
         for shard_id in self.shard_hist.iter() {
             let report_url = reqwest::Url::parse(&OPTIONS.server)?
-                .join("get_reports/")?
-                // get reports for current shard
+	        // set shard_id as root
                 .join(&(shard_id.to_string() + "/"))?
+		.join("get_reports/")?
                 // get previous batch
                 .join(&(batch_index - 1).to_string())?;
 
@@ -248,7 +246,6 @@ impl User {
             .try_into()
             .unwrap();
 
-        let report_url = reqwest::Url::parse(&OPTIONS.server)?.join("submit/")?;
 
         let client = reqwest::Client::new();
 
@@ -263,10 +260,13 @@ impl User {
                 .expect("writing should succeed");
 
             for shard_id in shard_ids.iter() {
+		let report_url = reqwest::Url::parse(&OPTIONS.server)?
+		    .join(&(shard_id.to_string()+"/"))?
+		    .join("submit/")?;
+
                 debug!(shard_id, "sending report to shard");
-                let shard_url = report_url.join(&shard_id.to_string())?;
                 client
-                    .post(shard_url.clone())
+                    .post(report_url.clone())
                     .body(report_bytes.clone())
                     .send()
                     .await?;
