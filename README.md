@@ -16,7 +16,7 @@ cargo run --release --bin simulator -- --help
 ```
 and play with the simulation parameters.
 
-Don't forget to set the batch interval to be short, e.g.:
+Because the simulator accelerates time but the backend server doesn't, don't forget to set the batch interval to be short, e.g.:
 
 ```
 cargo run --release --bin tcn_server -- -s 6
@@ -102,4 +102,3 @@ Apr 09 14:06:44.181  INFO save{report=SignedReport { report: Report { rvk: Publi
 Apr 09 14:06:44.181  INFO save{report=SignedReport { report: Report { rvk: PublicKeyBytes("d50a95c763f6e760f02adfc938f2d12cf8bd3a45962d63ae72ed5e893f7672c7"), tck_bytes: "1acacae0be1870e21771360bb1d30633e4d50016b42a7f84f64b9fd023a3b359", j_1: 1, j_2: 288, memo_type: CoEpiV1, memo_data: "" }, sig: Signature { R_bytes: "d47364bf28d8d99cb032c69b548d40d499eab4e4610a943fab01bbac78c33fb4", s_bytes: "a0f1c60fa7e6d279a6b6a368d089026e8e63e4be034933217a787b589ba13a0d" } }}: got report
 Apr 09 14:06:51.227  INFO get{timeframe=ReportTimestamp(264411067)}: sealed reports into byte buffer count=12 num_bytes=1608
 ```
-
