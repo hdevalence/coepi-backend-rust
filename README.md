@@ -26,10 +26,10 @@ cargo run --release --bin tcn_server -- -s 6
 
 The server has two routes:
 
-- `POST /submit` with the binary encoding of a TCN 0.4 report to submit a
+- `POST /{shard_id}/submit/` with the binary encoding of a TCN 0.4 report to submit a
   report;
 
-- `GET /get_reports/{n}` where `n` is the string encoding of a time interval
+- `GET /{shard_id}/get_reports/{n}` where `n` is the string encoding of a time interval
   index, computed as `unixtime / time_interval`.
 
 The `time_interval` is a deployment parameter, controlled by a command-line flag.

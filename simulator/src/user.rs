@@ -2,10 +2,10 @@ use eyre::eyre;
 use eyre::ErrReport;
 use futures::prelude::*;
 use rand::{
-    distributions::{Bernoulli, Distribution},
+    distributions::{Bernoulli, Distribution, Uniform},
     thread_rng,
 };
-use std::collections::BTreeSet;
+use std::collections::{BTreeSet, HashMap};
 use std::convert::TryInto;
 use std::io::Cursor;
 use std::time::Duration;
@@ -17,18 +17,29 @@ use tracing::{debug, error, info, instrument, trace, warn};
 
 use crate::OPTIONS;
 
+use crate::shard::Shard;
+use crate::shard::ShardId;
+
 pub struct User {
-    raks: Vec<ReportAuthorizationKey>,
+    rak: ReportAuthorizationKey, // Current rak
+    rak_shards: Vec<ShardId>,    // Shards this rak was used in
+    shard: Shard,                // Current shard
+    shard_hist: Vec<ShardId>,    // Shards since last report fetch
+    raks: Vec<(ReportAuthorizationKey, Vec<ShardId>)>,
     tck: TemporaryContactKey,
     observed_tcns: BTreeSet<TemporaryContactNumber>,
 }
 
-impl Default for User {
-    fn default() -> User {
+impl User {
+    pub fn init(shard_id: ShardId, tx: broadcast::Sender<TemporaryContactNumber>) -> User {
         let rak = ReportAuthorizationKey::new(thread_rng());
         let tck = rak.initial_temporary_contact_key();
         User {
-            raks: vec![rak],
+            rak,
+            rak_shards: vec![shard_id],
+            raks: Vec::new(),
+            shard: Shard::init(shard_id, tx),
+            shard_hist: vec![shard_id],
             tck,
             observed_tcns: BTreeSet::default(),
         }
@@ -36,14 +47,12 @@ impl Default for User {
 }
 
 impl User {
-    #[instrument(skip(self, tx))]
+    #[instrument(skip(self, channels))]
     pub async fn run(
         mut self,
         id: usize,
-        mut tx: broadcast::Sender<TemporaryContactNumber>,
+        channels: HashMap<ShardId, broadcast::Sender<TemporaryContactNumber>>,
     ) -> Result<(), ErrReport> {
-        let mut rx = tx.subscribe();
-
         // We will use the tck rotation as the root time ticker.
         let warped_tck_rotation =
             Duration::from_secs(OPTIONS.tck_rotation_secs).div_f64(OPTIONS.time_warp);
@@ -52,8 +61,10 @@ impl User {
             .try_into()
             .unwrap();
         let max_tcks = 86400 * OPTIONS.simulation_days / OPTIONS.tck_rotation_secs;
-        let mut tcn_observation = Bernoulli::new(OPTIONS.contact_probability).unwrap();
+        let tcn_observation = Bernoulli::new(OPTIONS.contact_probability).unwrap();
         let report_probability = Bernoulli::new(OPTIONS.report_probability).unwrap();
+        let shard_choices = Uniform::new(0u64, OPTIONS.num_shards);
+        let shard_change_probability = Bernoulli::new(OPTIONS.shard_change_probability).unwrap();
         let server_batch_interval = Duration::from_secs(OPTIONS.server_batch_interval);
 
         info!(
@@ -78,10 +89,13 @@ impl User {
             };
 
             // Generate and broadcast a TCN.
-            self.broadcast(&mut tx);
+            self.broadcast();
 
             // Listen for TCNs broadcast by others.
-            self.observe(&mut rx, &mut tcn_observation);
+            self.observe(&tcn_observation);
+
+            // Change to random shard sometimes
+            self.change_shard(&channels, &shard_choices, &shard_change_probability);
 
             // Optionally fetch new reports from the server.
             if time > (last_check + server_batch_interval) {
@@ -100,28 +114,42 @@ impl User {
     #[instrument(skip(self))]
     fn rotate_rak(&mut self) {
         debug!("rotating rak");
-        let rak = ReportAuthorizationKey::new(thread_rng());
-        self.tck = rak.initial_temporary_contact_key();
-        self.raks.push(rak);
+        self.raks.push((self.rak, self.rak_shards.clone()));
+        self.rak = ReportAuthorizationKey::new(thread_rng());
+        self.rak_shards = Vec::new();
+        self.tck = self.rak.initial_temporary_contact_key();
     }
 
-    #[instrument(skip(self, tx))]
-    fn broadcast(&mut self, tx: &mut broadcast::Sender<TemporaryContactNumber>) {
+    #[instrument(skip(self))]
+    fn broadcast(&mut self) {
         let tcn = self.tck.temporary_contact_number();
         self.tck = self.tck.ratchet().unwrap();
         trace!(?tcn);
-        tx.send(tcn).expect("broadcast should succeed");
+        self.shard.tx.send(tcn).expect("broadcast should succeed");
     }
 
-    #[instrument(skip(self, rx, tcn_observation))]
-    fn observe(
+    #[instrument(skip(self))]
+    fn change_shard(
         &mut self,
-        rx: &mut broadcast::Receiver<TemporaryContactNumber>,
-        tcn_observation: &mut Bernoulli,
-    ) -> Result<(), ErrReport> {
+        channels: &HashMap<ShardId, broadcast::Sender<TemporaryContactNumber>>,
+        shard_choices: &Uniform<ShardId>,
+        shard_change_probability: &Bernoulli,
+    ) {
+        if shard_change_probability.sample(&mut thread_rng()) {
+            self.rak_shards.push(self.shard.id);
+            self.shard_hist.push(self.shard.id);
+            let new_shard = shard_choices.sample(&mut thread_rng());
+            let new_tx = channels.get(&new_shard).unwrap().clone();
+
+            self.shard = Shard::init(new_shard, new_tx);
+        }
+    }
+
+    #[instrument(skip(self, tcn_observation))]
+    fn observe(&mut self, tcn_observation: &Bernoulli) -> Result<(), ErrReport> {
         loop {
             use broadcast::TryRecvError;
-            match rx.try_recv() {
+            match self.shard.rx.try_recv() {
                 Ok(tcn) => {
                     if tcn_observation.sample(&mut thread_rng()) {
                         debug!(?tcn, "observed tcn broadcast");
@@ -151,58 +179,64 @@ impl User {
             .as_secs()
             / OPTIONS.server_batch_interval;
 
-        let report_url = reqwest::Url::parse(&OPTIONS.server)?
-            .join("get_reports/")?
-            // get previous batch
-            .join(&(batch_index - 1).to_string())?;
+        for shard_id in self.shard_hist.iter() {
+            let report_url = reqwest::Url::parse(&OPTIONS.server)?
+                // set shard_id as root
+                .join(&(shard_id.to_string() + "/"))?
+                .join("get_reports/")?
+                // get previous batch
+                .join(&(batch_index - 1).to_string())?;
 
-        debug!(?report_url, "fetching reports");
-        let rsp = reqwest::get(report_url).await?;
+            debug!(?report_url, "fetching reports");
+            let rsp = reqwest::get(report_url).await?;
 
-        match rsp.status() {
-            reqwest::StatusCode::NOT_FOUND => {
-                debug!("Got 404 (empty record)");
-                return Ok(());
-            }
-            reqwest::StatusCode::OK => {
-                debug!("Got report data from server");
-            }
-            e => {
-                // can we attach rsp info here?
-                return Err(eyre!("got unknown status code {}", e));
-            }
-        }
-
-        let bytes = rsp.bytes().await?;
-
-        // Parse each report and process it
-        tokio::task::block_in_place(|| {
-            let mut candidate_tcns = BTreeSet::new();
-
-            // Parse and expand reports
-            let mut reader = Cursor::new(bytes.as_ref());
-            while let Ok(signed_report) = SignedReport::read(&mut reader) {
-                match signed_report.verify() {
-                    Ok(report) => {
-                        candidate_tcns.extend(report.temporary_contact_numbers());
-                    }
-                    Err(_) => {
-                        warn!("got report with invalid signature");
-                    }
+            match rsp.status() {
+                reqwest::StatusCode::NOT_FOUND => {
+                    debug!("Got 404 (empty record)");
+                    return Ok(());
+                }
+                reqwest::StatusCode::OK => {
+                    debug!("Got report data from server");
+                }
+                e => {
+                    // can we attach rsp info here?
+                    return Err(eyre!("got unknown status code {}", e));
                 }
             }
 
-            let mut matches = candidate_tcns.intersection(&self.observed_tcns);
-            while let Some(tcn) = matches.next() {
-                info!(?tcn, "got report about observed tcn");
-            }
-        });
+            let bytes = rsp.bytes().await?;
+
+            // Parse each report and process it
+            tokio::task::block_in_place(|| {
+                let mut candidate_tcns = BTreeSet::new();
+
+                // Parse and expand reports
+                let mut reader = Cursor::new(bytes.as_ref());
+                while let Ok(signed_report) = SignedReport::read(&mut reader) {
+                    match signed_report.verify() {
+                        Ok(report) => {
+                            candidate_tcns.extend(report.temporary_contact_numbers());
+                        }
+                        Err(_) => {
+                            warn!("got report with invalid signature");
+                        }
+                    }
+                }
+
+                let mut matches = candidate_tcns.intersection(&self.observed_tcns);
+                while let Some(tcn) = matches.next() {
+                    info!(?tcn, ?shard_id, "got report about observed tcn from shard");
+                }
+            });
+        }
 
         Ok(())
     }
 
     #[instrument(skip(self))]
     async fn send_reports(&mut self) -> Result<(), ErrReport> {
+        self.raks.push((self.rak, self.rak_shards.clone()));
+
         let raks_to_report =
             (86400 * OPTIONS.incubation_period_days / OPTIONS.rak_rotation_secs) as usize;
 
@@ -212,11 +246,9 @@ impl User {
             .try_into()
             .unwrap();
 
-        let report_url = reqwest::Url::parse(&OPTIONS.server)?.join("submit/")?;
-
         let client = reqwest::Client::new();
 
-        for rak in self.raks.iter().rev().take(raks_to_report) {
+        for (rak, shard_ids) in self.raks.iter().rev().take(raks_to_report) {
             let report = rak
                 .create_report(tcn::MemoType::CoEpiV1, Vec::new(), 1, tcks_per_rak)
                 .expect("memo data is not too long");
@@ -226,11 +258,18 @@ impl User {
                 .write(Cursor::new(&mut report_bytes))
                 .expect("writing should succeed");
 
-            client
-                .post(report_url.clone())
-                .body(report_bytes)
-                .send()
-                .await?;
+            for shard_id in shard_ids.iter() {
+                let report_url = reqwest::Url::parse(&OPTIONS.server)?
+                    .join(&(shard_id.to_string() + "/"))?
+                    .join("submit/")?;
+
+                debug!(shard_id, "sending report to shard");
+                client
+                    .post(report_url.clone())
+                    .body(report_bytes.clone())
+                    .send()
+                    .await?;
+            }
         }
 
         Ok(())
